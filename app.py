@@ -39,54 +39,54 @@ def home():
 def enhance_image():
     print("FILES RECEIVED:", request.files)
     print("FORM RECEIVED:", request.form)
-    try:
-        if 'image' not in request.files:
-            return jsonify({"error": "No image uploaded"}), 400
+    if 'image' not in request.files:
+        return jsonify({"error": "No image uploaded"}), 400
 
-        file = request.files['image']
+    file = request.files['image']
 
-        if file.filename == "":
-            return jsonify({"error": "Empty filename"}), 400
+    if file.filename == "":
+        return jsonify({"error": "Empty filename"}), 400
 
-        # Unique filename (avoid overwrite issues)
-        unique_id = str(uuid.uuid4())
-        filename = unique_id + "_" + file.filename
+    # Unique filename (avoid overwrite issues)
+    unique_id = str(uuid.uuid4())
+    filename = unique_id + "_" + file.filename
 
-        gamma = float(request.form.get("gamma", 1.2))
-        clip_limit = float(request.form.get("clip_limit", 3.0))
+    gamma = float(request.form.get("gamma", 1.2))
+    clip_limit = float(request.form.get("clip_limit", 3.0))
 
-        upload_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-        file.save(upload_path)
+    upload_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+    file.save(upload_path)
 
-        # Read Image
-        image = cv2.imread(upload_path)
+    # Read Image
+    image = cv2.imread(upload_path)
 
-        if image is None:
-            return jsonify({"error": "Invalid image format"}), 400
+    if image is None:
+        return jsonify({"error": "Invalid image format"}), 400
 
-        # Process Image
-        pipeline = EnhancementPipeline(gamma=gamma, clip_limit=clip_limit)
-        enhanced = pipeline.process(image)
+    # Process Image
+    mode = request.form.get("mode", "standard")
 
-        output_filename = "enhanced_" + filename
-        output_path = os.path.join(app.config["PROCESSED_FOLDER"], output_filename)
-        cv2.imwrite(output_path, enhanced)
+    pipeline = EnhancementPipeline(gamma=gamma, clip_limit=clip_limit)
+    enhanced = pipeline.process(image, mode=mode)
 
-        # Metrics
-        psnr = calculate_psnr(image, enhanced)
-        entropy = calculate_entropy(enhanced)
 
-        return jsonify({
-            "message": "Image processed successfully",
-            "psnr": round(float(psnr), 2),
-            "entropy": round(float(entropy), 2),
-            "original_image_url": url_for("uploaded_file", filename=filename),
-            "enhanced_image_url": url_for("processed_file", filename=output_filename),
-            "download_url": url_for("download_file", filename=output_filename)
-        })
+    output_filename = "enhanced_" + filename
+    output_path = os.path.join(app.config["PROCESSED_FOLDER"], output_filename)
+    cv2.imwrite(output_path, enhanced)
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    # Metrics
+    psnr = calculate_psnr(image, enhanced)
+    entropy = calculate_entropy(enhanced)
+
+    return jsonify({
+        "message": "Image processed successfully",
+        "psnr": round(float(psnr), 2),
+        "entropy": round(float(entropy), 2),
+        "original_image_url": url_for("uploaded_file", filename=filename),
+        "enhanced_image_url": url_for("processed_file", filename=output_filename),
+        "download_url": url_for("download_file", filename=output_filename)
+    })
+
 
 
 # ===============================
