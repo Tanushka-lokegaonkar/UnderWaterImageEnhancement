@@ -2,6 +2,7 @@ from .white_balance import WhiteBalance
 from .clahe import CLAHEEnhancer
 from .gamma import GammaCorrection
 from .sharpen import Sharpen
+import numpy as np
 
 from .wcid import WCID
 from .dcp import DCP
@@ -38,3 +39,4 @@ class EnhancementPipeline:
             image = self.dct.apply(image)
 
         return image
+
