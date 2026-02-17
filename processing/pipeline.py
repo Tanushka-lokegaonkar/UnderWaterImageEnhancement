@@ -15,7 +15,7 @@ from .hist_equalization import histogram_equalization
 
 class EnhancementPipeline:
 
-    def __init__(self, gamma=1.2, clip_limit=3.0):
+    def __init__(self, gamma=1.2, clip_limit=2.0):
 
         self.white_balance = WhiteBalance()
         self.clahe = CLAHEEnhancer(clip_limit)
