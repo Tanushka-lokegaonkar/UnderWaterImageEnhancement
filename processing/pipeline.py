@@ -2,6 +2,7 @@ from .white_balance import WhiteBalance
 from .clahe import CLAHEEnhancer
 from .gamma import GammaCorrection
 from .sharpen import Sharpen
+from .SimpleSeaThru import StableSeaThru
 import numpy as np
 
 from .wcid import WCID
@@ -21,6 +22,7 @@ class EnhancementPipeline:
         self.clahe = CLAHEEnhancer(clip_limit)
         self.gamma = GammaCorrection(gamma)
         self.sharpen = Sharpen()
+        self.seathru = StableSeaThru()
 
         self.wcid = WCID()
         self.dcp = DCP()
@@ -54,6 +56,9 @@ class EnhancementPipeline:
 
         elif mode == "histogram":
             image = histogram_equalization(image)
+
+        elif mode == "seathru":
+            image = self.seathru.apply(image)
 
         return image
 
