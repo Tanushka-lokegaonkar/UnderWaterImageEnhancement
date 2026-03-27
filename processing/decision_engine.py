@@ -1,14 +1,20 @@
-import numpy as np
-
 class DecisionEngine:
+    """
+    Hybrid Decision Engine:
+    1. Uses features to shortlist candidate modes
+    2. Removes duplicates
+    3. Ensures strong fallback methods
+    """
+
     def __init__(self):
         pass
 
     # -----------------------------
-    # Rule-based technique selection
+    # Feature-based candidate selection
     # -----------------------------
-    def select_techniques(self, features):
-        techniques = []
+    def get_candidate_modes(self, features):
+
+        candidates = []
 
         r = features['r']
         g = features['g']
@@ -17,32 +23,50 @@ class DecisionEngine:
         contrast = features['contrast']
         entropy = features['entropy']
 
-        # Rule 1: Strong blue dominance → color correction needed
-        if b > r + 30:
-            techniques.append("white_balance")
+        # -----------------------------
+        # COLOR CAST (Underwater blue dominance)
+        # -----------------------------
+        if b > r + 0.05:
+            candidates += ["dcp", "seathru", "standard"]
 
-        # Rule 2: Low brightness → gamma correction
-        if brightness < 80:
-            techniques.append("gamma")
+        # -----------------------------
+        # LOW CONTRAST
+        # -----------------------------
+        if contrast < 0.4:
+            candidates += ["contrast", "histogram", "standard"]
 
-        # Rule 3: Low contrast → CLAHE
-        if contrast < 40:
-            techniques.append("clahe")
+        # -----------------------------
+        # LOW BRIGHTNESS
+        # -----------------------------
+        if brightness < 0.5:
+            candidates += ["gamma", "homomorphic", "standard"]
 
-        # Rule 4: Low entropy → sharpening
-        if entropy < 5:
-            techniques.append("sharpen")
+        # -----------------------------
+        # LOW DETAIL (LOW ENTROPY)
+        # -----------------------------
+        if entropy < 0.7:
+            candidates += ["sharpen", "guided", "standard"]
 
-        # Default fallback
-        if len(techniques) == 0:
-            techniques.append("fusion")
+        # -----------------------------
+        # ALWAYS INCLUDE STRONG METHODS
+        # -----------------------------
+        candidates += ["standard", "wcid", "fusion"]
 
-        return techniques
+        # Remove duplicates
+        candidates = list(set(candidates))
+
+        return candidates
+
 
     # -----------------------------
-    # BONUS 2: Score-based ranking
+    # Optional: Priority Sorting (BONUS)
     # -----------------------------
-    def rank_techniques(self, features):
+    def rank_modes(self, features, candidates):
+        """
+        Assign simple priority scores to candidate modes
+        (Not final decision — just ordering)
+        """
+
         scores = {}
 
         brightness = features['brightness']
@@ -51,53 +75,53 @@ class DecisionEngine:
         r = features['r']
         b = features['b']
 
-        # Higher score = more needed
+        for mode in candidates:
 
-        # CLAHE → improves contrast
-        scores['clahe'] = contrast
+            if mode == "dcp":
+                scores[mode] = (b - r) + (1 - contrast)
 
-        # Sharpen → improves detail
-        scores['sharpen'] = entropy
+            elif mode == "seathru":
+                scores[mode] = (b - r) + (1 - brightness)
 
-        # Gamma → helps dark images
-        scores['gamma'] = 255 - brightness
+            elif mode == "clahe":
+                scores[mode] = (1 - contrast)
 
-        # White balance → corrects blue dominance
-        scores['white_balance'] = max(0, b - r)
+            elif mode == "gamma":
+                scores[mode] = (1 - brightness)
 
-        # Fusion → general enhancement baseline
-        scores['fusion'] = 50  # neutral score
+            elif mode == "sharpen":
+                scores[mode] = (1 - entropy)
 
-        # Sort descending (highest priority first)
+            elif mode == "homomorphic":
+                scores[mode] = (1 - brightness) + (1 - contrast)
+
+            elif mode == "contrast":
+                scores[mode] = (1 - contrast)
+
+            elif mode == "histogram":
+                scores[mode] = (1 - contrast)
+
+            else:
+                scores[mode] = 0.5  # neutral
+
+        # Sort descending
         ranked = sorted(scores, key=scores.get, reverse=True)
 
         return ranked, scores
 
+
     # -----------------------------
-    # FINAL selector (combined logic)
+    # FINAL METHOD (USED IN PIPELINE)
     # -----------------------------
-    def get_final_techniques(self, features, top_k=2):
-        """
-        Combines:
-        - Rule-based filtering
-        - Score-based ranking
-        - Multi-technique selection (top_k)
-        """
+    def get_final_candidates(self, features):
 
-        # Step 1: rule-based shortlist
-        selected = self.select_techniques(features)
+        # Step 1: Get candidates
+        candidates = self.get_candidate_modes(features)
 
-        # Step 2: ranking
-        ranked, scores = self.rank_techniques(features)
+        # Step 2: Rank them (optional but useful)
+        ranked, scores = self.rank_modes(features, candidates)
 
-        # Step 3: keep only relevant ones from ranked
-        filtered_ranked = [t for t in ranked if t in selected]
+        # Step 3: Limit to top N (for speed)
+        top_candidates = ranked[:5]
 
-        # Step 4: pick top_k techniques
-        final = filtered_ranked[:top_k]
-
-        # Safety fallback
-        if len(final) == 0:
-            final = ["fusion"]
-
-        return final, scores
+        return top_candidates, scores

@@ -4,3 +4,9 @@ numpy
 scikit-image
 flask-cors
 PyWavelets
+
+pennylane
+pennylane-lightning
+
+# If you use Qiskit instead of PennyLane (optional)
+qiskit

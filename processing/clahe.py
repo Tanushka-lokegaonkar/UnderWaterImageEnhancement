@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 class CLAHEEnhancer:
-    def __init__(self, clip_limit=2.0):
+    def __init__(self, clip_limit):
         self.clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=(8,8))
 
     def apply(self, image):

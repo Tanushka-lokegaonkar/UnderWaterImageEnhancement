@@ -2,9 +2,9 @@ from .white_balance import WhiteBalance
 from .clahe import CLAHEEnhancer
 from .gamma import GammaCorrection
 from .sharpen import Sharpen
+from .sharpen2 import Sharpen2
 from .SimpleSeaThru import StableSeaThru
-import numpy as np
-import cv2
+from .quantum_enhancer import QuantumEnhancer
 
 from .wcid import WCID
 from .dcp import DCP
@@ -15,100 +15,119 @@ from .homomorphic_filtering import homomorphic_filter
 from .guided_filtering import guided_filter_enhancement
 from .hist_equalization import histogram_equalization
 
+from processing.feature_extractor import extract_features
+from processing.decision_engine import DecisionEngine
+
+from metrics.entropy import calculate_entropy
+
+import numpy as np
+import cv2
+
+
 class EnhancementPipeline:
 
     def __init__(self, gamma=1.2, clip_limit=2.0):
 
-        self.white_balance = WhiteBalance()
+        # Stronger defaults for visible output
+        self.white_balance = WhiteBalance(percent=2)
         self.clahe = CLAHEEnhancer(clip_limit)
         self.gamma = GammaCorrection(gamma)
-        self.sharpen = Sharpen()
+        self.sharpen = Sharpen(strength=2.0)
+        self.sharpen2 = Sharpen2()
+
         self.seathru = StableSeaThru()
+        self.quantum = QuantumEnhancer()
 
         self.wcid = WCID()
         self.dcp = DCP()
         self.dct = DCT()
 
-    # def process(self, image, mode="standard"):
+        self.engine = DecisionEngine()
 
-    #     if mode == "standard":
-    #         image = self.white_balance.apply(image)
-    #         image = self.clahe.apply(image)
-    #         image = self.gamma.apply(image)
-    #         image = self.sharpen.apply(image)
+    # -----------------------------
+    # EXISTING MODES (UNCHANGED)
+    # -----------------------------
+    def process(self, image, mode):
 
-    #     elif mode == "wcid":
-    #         image = self.wcid.apply(image)
+        if mode == "auto":
+            return self.auto_process(image)
 
-    #     elif mode == "dcp":
-    #         image = self.dcp.apply(image)
+        if mode == "standard":
+            image = self.white_balance.apply(image)
+            image = self.clahe.apply(image)
+            image = self.gamma.apply(image)
+            image = self.sharpen2.apply(image)
 
-    #     elif mode == "dct":
-    #         image = self.dct.apply(image)
+        elif mode == "quantum_enhance":
+            image = self.quantum.apply(image)
 
-    #     elif mode == "contrast":
-    #         image = contrast_maximization(image)
+        elif mode == "wcid":
+            image = self.wcid.apply(image)
 
-    #     elif mode == "homomorphic":
-    #         image = homomorphic_filter(image)
-    #         image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+        elif mode == "dcp":
+            image = self.dcp.apply(image)
 
-    #     elif mode == "guided":
-    #         image = guided_filter_enhancement(image)
+        elif mode == "dct":
+            image = self.dct.apply(image)
 
-    #     elif mode == "histogram":
-    #         image = histogram_equalization(image)
+        elif mode == "contrast":
+            image = contrast_maximization(image)
 
-    #     elif mode == "seathru":
-    #         image = self.seathru.apply(image)
+        elif mode == "homomorphic":
+            image = homomorphic_filter(image)
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
 
-    #     return image
+        elif mode == "guided":
+            image = guided_filter_enhancement(image)
 
-    def process(self, image, techniques):
-        output = image.copy()
+        elif mode == "histogram":
+            image = histogram_equalization(image)
 
-        for tech in techniques:
+        elif mode == "seathru":
+            image = self.seathru.apply(image)
 
-            if tech == "white_balance":
-                output = self.white_balance.apply(output)
+        return image
 
-            elif tech == "gamma":
-                output = self.gamma.apply(output)
+    # -----------------------------
+    # AUTO MODE (FINAL HYBRID)
+    # -----------------------------
+    def auto_process(self, image):
 
-            elif tech == "clahe":
-                output = self.clahe.apply(output)
+        # STEP 1: Feature extraction
+        features = extract_features(image, debug=True)
 
-            elif tech == "sharpen":
-                output = self.sharpen.apply(output)
+        # STEP 2: Get smart candidates
+        candidates, scores = self.engine.get_final_candidates(features)
 
-            elif tech == "wcid":
-                output = self.wcid.apply(output)
+        print("\nCandidates:", candidates)
 
-            elif tech == "dcp":
-                output = self.dcp.apply(output)
+        best_score = -1
+        best_output = image
+        best_mode = None
 
-            elif tech == "dct":
-                output = self.dct.apply(output)
+        # STEP 3: Evaluate candidates
+        for mode in candidates:
+            try:
+                temp = self.process(image.copy(), mode)
 
-            elif tech == "contrast":
-                output = contrast_maximization(output)
+                # Metrics
+                entropy = calculate_entropy(temp)
+                contrast = np.std(cv2.cvtColor(temp, cv2.COLOR_BGR2GRAY))
+                brightness = np.mean(cv2.cvtColor(temp, cv2.COLOR_BGR2GRAY))
 
-            elif tech == "homomorphic":
-                h = homomorphic_filter(output)
-                output = cv2.cvtColor(h, cv2.COLOR_GRAY2BGR)
+                # Combined score (balanced)
+                score = entropy + 0.4 * contrast + 0.2 * brightness
 
-            elif tech == "guided":
-                output = guided_filter_enhancement(output)
+                print(f"{mode} → score: {score:.2f}")
 
-            elif tech == "histogram":
-                output = histogram_equalization(output)
+                if score > best_score:
+                    best_score = score
+                    best_output = temp
+                    best_mode = mode
 
-            elif tech == "seathru":
-                output = self.seathru.apply(output)
+            except Exception as e:
+                print(f"{mode} failed:", e)
 
-            elif tech == "fusion":
-                # (Optional: if you don't have fusion yet, use this)
-                output = self.white_balance.apply(output)
-                output = self.clahe.apply(output)
+        print("\n✅ Best mode selected:", best_mode)
 
-        return output
+        return best_output, best_mode

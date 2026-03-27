@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 
 class GammaCorrection:
-    def __init__(self, gamma=1.2):
+    def __init__(self, gamma):
         self.gamma = max(gamma, 0.1)
 
     def apply(self, image):

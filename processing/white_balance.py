@@ -19,6 +19,16 @@ class WhiteBalance:
             low_val = flat[int(len(flat) * half_percent)]
             high_val = flat[int(len(flat) * (1 - half_percent))]
             
+        #     if high_val - low_val == 0:
+        #         stretched = channel
+        #     else:
+        #         # Apply contrast stretching manually
+        #         stretched = (channel - low_val) * 255.0 / (high_val - low_val)
+        #         stretched = np.clip(stretched, 0, 255)
+
+        #     out_channels.append(stretched.astype(np.uint8))
+
+        # return cv2.merge(out_channels)
             # Stretch the channel and clip
             stretched = cv2.normalize(channel, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
             out_channels.append(np.clip(stretched, 0, 255))

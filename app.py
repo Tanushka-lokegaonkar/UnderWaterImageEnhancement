@@ -9,7 +9,182 @@ from metrics.entropy import calculate_entropy
 from processing.decision_engine import DecisionEngine
 
 from processing.feature_extractor import extract_features
+import os
+import uuid
+import cv2
+from flask import Flask, request, jsonify, send_file, render_template, url_for
+from flask_cors import CORS
 
+from processing.pipeline import EnhancementPipeline
+from metrics.psnr import calculate_psnr
+from metrics.entropy import calculate_entropy
+
+app = Flask(__name__)
+CORS(app)
+
+# ===============================
+# Configuration
+# ===============================
+UPLOAD_FOLDER = "uploads"
+PROCESSED_FOLDER = "processed"
+
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(PROCESSED_FOLDER, exist_ok=True)
+
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+app.config["PROCESSED_FOLDER"] = PROCESSED_FOLDER
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB
+
+
+# ===============================
+# Homepage
+# ===============================
+@app.route("/")
+def home():
+    return render_template("index.html")
+
+
+# ===============================
+# Enhancement Route
+# ===============================
+@app.route("/enhance", methods=["POST"])
+def enhance_image():
+
+    if "image" not in request.files:
+        return jsonify({"error": "No image uploaded"}), 400
+
+    file = request.files["image"]
+
+    if file.filename == "":
+        return jsonify({"error": "Empty filename"}), 400
+
+    try:
+        # -----------------------------
+        # Save uploaded file
+        # -----------------------------
+        unique_id = str(uuid.uuid4())
+        filename = unique_id + "_" + file.filename
+
+        upload_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+        file.save(upload_path)
+
+        # -----------------------------
+        # Read image
+        # -----------------------------
+        image = cv2.imread(upload_path)
+
+        if image is None:
+            return jsonify({"error": "Invalid image format"}), 400
+
+        # -----------------------------
+        # Parameters
+        # -----------------------------
+        gamma = float(request.form.get("gamma", 1.5))
+        clip_limit = float(request.form.get("clip_limit", 4.0))
+        mode = request.form.get("mode", "standard")
+
+        pipeline = EnhancementPipeline(gamma=gamma, clip_limit=clip_limit)
+
+        # -----------------------------
+        # PROCESSING
+        # -----------------------------
+        if mode == "auto":
+            enhanced, best_mode = pipeline.process(image, mode="auto")
+        else:
+            enhanced = pipeline.process(image, mode=mode)
+            best_mode = mode
+
+        if enhanced is None:
+            return jsonify({"error": "Processing failed"}), 500
+
+        # -----------------------------
+        # Resize if needed (for PSNR)
+        # -----------------------------
+        if enhanced.shape[:2] != image.shape[:2]:
+            enhanced = cv2.resize(
+                enhanced,
+                (image.shape[1], image.shape[0])
+            )
+
+        # -----------------------------
+        # Save output
+        # -----------------------------
+        output_filename = "enhanced_" + filename
+        output_path = os.path.join(
+            app.config["PROCESSED_FOLDER"],
+            output_filename
+        )
+
+        cv2.imwrite(output_path, enhanced)
+
+        # -----------------------------
+        # Metrics
+        # -----------------------------
+        psnr = calculate_psnr(image, enhanced)
+        entropy = calculate_entropy(enhanced)
+
+        # -----------------------------
+        # Response
+        # -----------------------------
+        return jsonify({
+            "message": "Image processed successfully",
+            "mode": mode,
+            "selected_method": best_mode,   # 🔥 important for auto mode
+            "psnr": round(float(psnr), 2),
+            "entropy": round(float(entropy), 2),
+
+            "original_image_url": url_for(
+                "uploaded_file", filename=filename
+            ),
+            "enhanced_image_url": url_for(
+                "processed_file", filename=output_filename
+            ),
+            "download_url": url_for(
+                "download_file", filename=output_filename
+            )
+        })
+
+    except Exception as e:
+        print("ERROR:", str(e))
+        return jsonify({"error": "Internal server error"}), 500
+
+
+# ===============================
+# Serve Uploaded Image
+# ===============================
+@app.route("/uploads/<filename>")
+def uploaded_file(filename):
+    return send_file(
+        os.path.join(app.config["UPLOAD_FOLDER"], filename)
+    )
+
+
+# ===============================
+# Serve Processed Image
+# ===============================
+@app.route("/processed/<filename>")
+def processed_file(filename):
+    return send_file(
+        os.path.join(app.config["PROCESSED_FOLDER"], filename)
+    )
+
+
+# ===============================
+# Download Route
+# ===============================
+@app.route("/download/<filename>")
+def download_file(filename):
+    return send_file(
+        os.path.join(app.config["PROCESSED_FOLDER"], filename),
+        as_attachment=True
+    )
+
+
+# ===============================
+# Run App
+# ===============================
+if __name__ == "__main__":
+    app.run(debug=True)
 app = Flask(__name__)
 CORS(app)
 
@@ -65,40 +240,35 @@ def enhance_image():
         # Read Image
         image = cv2.imread(upload_path)
 
-        # features = extract_features(image, debug=True)
         features = extract_features(image, debug=True)
-        engine = DecisionEngine()
-        techniques, scores = engine.get_final_techniques(features, top_k=2)
-
-        pipeline = EnhancementPipeline() 
-        enhanced = pipeline.process(image, techniques)
 
 
         if image is None:
             return jsonify({"error": "Invalid image format"}), 400
 
         # Process Image
-        # mode = request.form.get("mode", "standard")
-
-        # pipeline = EnhancementPipeline(gamma=gamma, clip_limit=clip_limit)
-        # enhanced = pipeline.process(image, mode=mode)
         pipeline = EnhancementPipeline(gamma=gamma, clip_limit=clip_limit)
+        mode = request.form.get("mode", "standard")
+        if mode != "auto":
+            enhanced = pipeline.process(image, mode=mode)
 
-        # AI-driven technique selection
-        engine = DecisionEngine()
-        techniques, scores = engine.get_final_techniques(features, top_k=2)
+            if enhanced is None:
+                return jsonify({"error": "Image processing failed"}), 500
+        else:
+            features = extract_features(image)
+            features = {k: float(v) for k, v in features.items()}
 
-        scores = {k: float(v) for k, v in scores.items()}
-        features = {k: float(v) for k, v in features.items()}
+            engine = DecisionEngine()
+            techniques, scores = engine.get_final_candidates(features)
 
-        print("Selected techniques:", techniques)
-        print("Scores:", scores)
+            scores = {k: float(v) for k, v in scores.items()}
+            print("Auto mode techniques:", techniques)
+            print("Technique scores:", scores)
 
-        enhanced = pipeline.process(image, techniques)
-
-        if enhanced is None:
-            return jsonify({"error": "Image processing failed"}), 500
-
+            enhanced = pipeline.process(image, techniques)
+            if enhanced is None:
+                return jsonify({"error": "Processing failed"}), 500
+        
         # Ensure same size as original (important for PSNR)
         if enhanced.shape[:2] != image.shape[:2]:
             enhanced = cv2.resize(
@@ -122,30 +292,18 @@ def enhance_image():
 
         return jsonify({
             "message": "Image processed successfully",
-            "selected_techniques": techniques,
-            "scores": scores,
-            "features": features,
             "psnr": round(float(psnr), 2),
-            "entropy_after": round(float(entropy), 2),
-            "original_image_url": url_for("uploaded_file", filename=filename),
-            "enhanced_image_url": url_for("processed_file", filename=output_filename),
-            "download_url": url_for("download_file", filename=output_filename)
+            "entropy": round(float(entropy), 2),
+            "original_image_url": url_for(
+                "uploaded_file", filename=filename
+            ),
+            "enhanced_image_url": url_for(
+                "processed_file", filename=output_filename
+            ),
+            "download_url": url_for(
+                "download_file", filename=output_filename
+            )
         })
-
-        # return jsonify({
-        #     "message": "Image processed successfully",
-        #     "psnr": round(float(psnr), 2),
-        #     "entropy": round(float(entropy), 2),
-        #     "original_image_url": url_for(
-        #         "uploaded_file", filename=filename
-        #     ),
-        #     "enhanced_image_url": url_for(
-        #         "processed_file", filename=output_filename
-        #     ),
-        #     "download_url": url_for(
-        #         "download_file", filename=output_filename
-        #     )
-        # })
 
     except Exception as e:
         print("ERROR:", str(e))
