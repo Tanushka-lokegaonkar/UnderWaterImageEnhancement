@@ -7,6 +7,8 @@ from processing.pipeline import EnhancementPipeline
 from metrics.psnr import calculate_psnr
 from metrics.entropy import calculate_entropy
 
+from processing.feature_extractor import extract_features
+
 app = Flask(__name__)
 CORS(app)
 
@@ -61,6 +63,9 @@ def enhance_image():
 
         # Read Image
         image = cv2.imread(upload_path)
+
+        features = extract_features(image, debug=True)
+
 
         if image is None:
             return jsonify({"error": "Invalid image format"}), 400
