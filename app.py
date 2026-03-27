@@ -6,6 +6,7 @@ from flask_cors import CORS
 from processing.pipeline import EnhancementPipeline
 from metrics.psnr import calculate_psnr
 from metrics.entropy import calculate_entropy
+from processing.decision_engine import DecisionEngine
 
 from processing.feature_extractor import extract_features
 
@@ -64,17 +65,36 @@ def enhance_image():
         # Read Image
         image = cv2.imread(upload_path)
 
+        # features = extract_features(image, debug=True)
         features = extract_features(image, debug=True)
+        engine = DecisionEngine()
+        techniques, scores = engine.get_final_techniques(features, top_k=2)
+
+        pipeline = EnhancementPipeline() 
+        enhanced = pipeline.process(image, techniques)
 
 
         if image is None:
             return jsonify({"error": "Invalid image format"}), 400
 
         # Process Image
-        mode = request.form.get("mode", "standard")
+        # mode = request.form.get("mode", "standard")
 
+        # pipeline = EnhancementPipeline(gamma=gamma, clip_limit=clip_limit)
+        # enhanced = pipeline.process(image, mode=mode)
         pipeline = EnhancementPipeline(gamma=gamma, clip_limit=clip_limit)
-        enhanced = pipeline.process(image, mode=mode)
+
+        # AI-driven technique selection
+        engine = DecisionEngine()
+        techniques, scores = engine.get_final_techniques(features, top_k=2)
+
+        scores = {k: float(v) for k, v in scores.items()}
+        features = {k: float(v) for k, v in features.items()}
+
+        print("Selected techniques:", techniques)
+        print("Scores:", scores)
+
+        enhanced = pipeline.process(image, techniques)
 
         if enhanced is None:
             return jsonify({"error": "Image processing failed"}), 500
@@ -102,18 +122,30 @@ def enhance_image():
 
         return jsonify({
             "message": "Image processed successfully",
+            "selected_techniques": techniques,
+            "scores": scores,
+            "features": features,
             "psnr": round(float(psnr), 2),
-            "entropy": round(float(entropy), 2),
-            "original_image_url": url_for(
-                "uploaded_file", filename=filename
-            ),
-            "enhanced_image_url": url_for(
-                "processed_file", filename=output_filename
-            ),
-            "download_url": url_for(
-                "download_file", filename=output_filename
-            )
+            "entropy_after": round(float(entropy), 2),
+            "original_image_url": url_for("uploaded_file", filename=filename),
+            "enhanced_image_url": url_for("processed_file", filename=output_filename),
+            "download_url": url_for("download_file", filename=output_filename)
         })
+
+        # return jsonify({
+        #     "message": "Image processed successfully",
+        #     "psnr": round(float(psnr), 2),
+        #     "entropy": round(float(entropy), 2),
+        #     "original_image_url": url_for(
+        #         "uploaded_file", filename=filename
+        #     ),
+        #     "enhanced_image_url": url_for(
+        #         "processed_file", filename=output_filename
+        #     ),
+        #     "download_url": url_for(
+        #         "download_file", filename=output_filename
+        #     )
+        # })
 
     except Exception as e:
         print("ERROR:", str(e))
