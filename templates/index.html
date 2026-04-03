@@ -27,7 +27,6 @@
 
         <div class="card" id="tilt-card">
             <form id="uploadForm" enctype="multipart/form-data">
-                
                 <div class="upload-container">
                     <input type="file" name="image" id="imageInput" required hidden>
                     <label for="imageInput" class="glass-upload">
@@ -41,7 +40,7 @@
                     <div class="select-wrapper">
                         <select name="mode" id="modeSelect">
                             <option value="standard">STANDARD ENHANCEMENT</option>
-                            <option value="auto">AI Auto Mode</option>
+                            <option value="auto">AUTO MODE</option>
                             <option value="quantum_enhance">QUANTUM ENHANCEMENT</option>
                             <option value="wcid">WCID ALGORITHM</option>
                             <option value="dcp">DCP (DARK CHANNEL)</option>
@@ -67,6 +66,21 @@
                     <div class="sonar-ring"></div>
                 </div>
                 <p class="loader-text">SCANNING TURBIDITY...</p>
+            </div>
+        </div>
+
+        <div class="card info-briefing" id="infoCard">
+            <div class="briefing-header">
+                <span class="briefing-icon">🛰️</span>
+                <h3>PROTOCOL ANALYSIS</h3>
+            </div>
+            <div class="briefing-content">
+                <h4 id="algo-name">STANDARD ENHANCEMENT</h4>
+                <p id="algo-description">General-purpose restoration protocol. Balances color attenuation and basic contrast for shallow-water imagery.</p>
+                <div class="tech-specs">
+                    <span class="badge" id="algo-complexity">LATENCY: LOW</span>
+                    <span class="badge" id="algo-tag">TYPE: LINEAR</span>
+                </div>
             </div>
         </div>
 

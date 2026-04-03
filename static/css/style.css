@@ -185,3 +185,70 @@ select#modeSelect {
     border-radius: 30px;
     transition: 0.3s;
 }
+
+/* --- Algorithm Info Card Styling --- */
+.info-briefing {
+    margin-top: 25px;
+    padding: 20px;
+    border-left: 4px solid #00f2ff;
+    background: rgba(10, 30, 50, 0.6) !important;
+    backdrop-filter: blur(12px);
+    border-radius: 4px 15px 15px 4px;
+    animation: slideIn 0.5s ease-out;
+}
+
+.briefing-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid rgba(0, 242, 255, 0.2);
+    padding-bottom: 8px;
+}
+
+.briefing-header h3 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.75rem;
+    letter-spacing: 2px;
+    color: #00f2ff;
+    margin: 0;
+}
+
+#algo-name {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin: 0 0 8px 0;
+    text-transform: uppercase;
+    text-shadow: 0 0 10px rgba(0, 242, 255, 0.5);
+}
+
+#algo-description {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.95rem;
+    color: #a0c4d1;
+    line-height: 1.5;
+    margin-bottom: 15px;
+}
+
+.tech-specs {
+    display: flex;
+    gap: 10px;
+}
+
+.badge {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.65rem;
+    padding: 4px 10px;
+    background: rgba(0, 242, 255, 0.05);
+    border: 1px solid rgba(0, 242, 255, 0.4);
+    color: #00f2ff;
+    border-radius: 2px;
+    text-transform: uppercase;
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
